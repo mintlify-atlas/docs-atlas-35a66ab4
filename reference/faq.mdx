@@ -1,0 +1,53 @@
+---
+title: "WhatCable frequently asked questions"
+description: "Answers to common questions about WhatCable: why Intel isn't supported, why cables show no e-marker, what the 5W tolerance means, and more."
+---
+
+These are the questions that come up most often. If you don't find an answer here, open an issue on the [GitHub repository](https://github.com/darrylmorley/whatcable).
+
+<AccordionGroup>
+  <Accordion title="Why doesn't WhatCable support Intel Macs?">
+    Intel Macs route USB-C through Intel Titan Ridge (JHL9580) Thunderbolt 3 controllers. Apple's IOKit driver for those chips does not expose USB-PD negotiation state or cable e-marker VDOs through any public accessor. There is no path to surface the same information on Intel hardware — it is a hardware and driver limitation, not a software one.
+  </Accordion>
+
+  <Accordion title="Why does my cable show 'no e-marker'?">
+    Most cables under 60W and charge-only cables are not e-marked. An e-marker chip is required for cables rated above 60W (5A), for Thunderbolt and USB4 cables, and for most quality data cables. If you plug in a basic USB-C charge cable, WhatCable will show **"Cable does not advertise an e-marker (basic cable)"** — that is correct behavior, not a bug.
+  </Accordion>
+
+  <Accordion title="Can I trust the cable speed shown?">
+    WhatCable reads the speed directly from the e-marker chip (the PD Discover Identity SOP' response). Reputable cables accurately advertise their real capability. Counterfeit or mislabelled cables may have a mis-flashed chip that claims 40 Gbps when the cable physically cannot achieve it. If a cable advertises Thunderbolt 4 but performs poorly, the chip is lying — not WhatCable.
+  </Accordion>
+
+  <Accordion title="Why is my Mac only charging at 30W when my charger is 96W?">
+    This is normal behavior once the battery is mostly full or when the system is idle. macOS uses trickle charging in the upper charge band and requests less power to protect the battery. WhatCable will show a **"Charging at 30W (charger can do up to 96W)"** banner and explain that both the charger and cable can do more but the Mac is currently asking for less. No action is needed.
+  </Accordion>
+
+  <Accordion title="Why doesn't WhatCable show my charger's full PDO list?">
+    The PDO list is read from `IOPortFeaturePowerSource`. Some power sources — including Apple MagSafe adapters and basic 5V-only chargers that don't negotiate USB Power Delivery — may not expose a full PDO list via that accessor. When negotiation is in progress, only a single winning PDO may be visible rather than the full options list.
+  </Accordion>
+
+  <Accordion title="What does 'Charger advertises up to NW' mean without a checkmark?">
+    The charger has sent its PDO list but USB-PD negotiation has not completed yet — there is no winning profile. This state is usually transient. Refresh WhatCable after a few seconds and the negotiated profile should appear.
+  </Accordion>
+
+  <Accordion title="Is WhatCable safe? Does it need special permissions?">
+    WhatCable reads three families of public IOKit services — `AppleHPMInterfaceType10/11/12`, `IOPortFeaturePowerSource`, and `IOPortTransportComponentCCUSBPDSOP`. It uses no private APIs, no special entitlements, and no helper daemons. The app is signed with a Developer ID and notarised by Apple, so Gatekeeper clears it without any warnings.
+  </Accordion>
+
+  <Accordion title="What is the CLI and how do I get it?">
+    A `whatcable` binary ships alongside the menu bar app and uses the same diagnostic engine. If you install via Homebrew, the CLI is symlinked into your PATH automatically:
+
+    ```bash
+    brew tap darrylmorley/whatcable
+    brew install --cask whatcable
+    ```
+
+    For manual installs, symlink the binary from inside the app bundle:
+
+    ```bash
+    ln -s /Applications/WhatCable.app/Contents/Helpers/whatcable /usr/local/bin/whatcable
+    ```
+
+    Once installed, run `whatcable --help` to see all available flags.
+  </Accordion>
+</AccordionGroup>

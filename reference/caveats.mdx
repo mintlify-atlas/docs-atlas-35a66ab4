@@ -1,0 +1,45 @@
+---
+title: "WhatCable limitations and caveats"
+description: "Known limitations of WhatCable: e-marker availability, counterfeit cable trust, PD 3.2 coverage, vendor database completeness, and platform restrictions."
+---
+
+WhatCable is accurate within what the hardware and spec expose — there are a few things worth being aware of before you rely on a reading.
+
+<AccordionGroup>
+  <Accordion title="E-marker only on marked cables">
+    Most USB-C cables under 60W do not contain an e-marker chip. WhatCable shows **"Cable does not advertise an e-marker (basic cable)"** for those cables because there is nothing to read — this is expected, not an error.
+
+    Cables that will have an e-marker:
+    - Thunderbolt 3, Thunderbolt 4, and USB4 cables
+    - Any cable rated for 5A / 100W or above
+    - Most quality USB 3.2 data cables
+
+    A basic $5 USB-C charge cable almost certainly has no e-marker chip.
+  </Accordion>
+
+  <Accordion title="WhatCable trusts the e-marker">
+    Cable speed, current rating, and vendor name are read directly from the chip inside the cable's plug (the PD Discover Identity SOP' response). WhatCable reports what the chip says.
+
+    Counterfeit or mis-flashed chips can advertise capabilities the cable physically cannot deliver. There is no way for software to verify what is inside the cable jacket. If a cable claims 240W / 40 Gbps but performs poorly in practice, the chip is lying — not WhatCable.
+  </Accordion>
+
+  <Accordion title="PD 3.2 EPR coverage may be incomplete">
+    The decoder targets USB Power Delivery 3.0 and 3.1. PD 3.2 EPR variants — introduced for USB4 Gen 4 cables capable of 80 Gbps — may need tweaks once real hardware data is available. If you own a PD 3.2 EPR cable and the reading looks wrong, please open an issue on GitHub.
+  </Accordion>
+
+  <Accordion title="Vendor name database is not exhaustive">
+    Common cable, charger, hub, dock, and storage vendors are recognised by their USB Vendor ID and resolved to a friendly name. Vendors not in the bundled database fall back to the raw hex VID — for example, `0x1234`. This is a database coverage gap, not a cable problem.
+  </Accordion>
+
+  <Accordion title="macOS only">
+    WhatCable depends on IOKit accessors that expose USB-PD negotiation state and cable e-marker VDOs. iOS sandboxing makes that class of IOKit access much harder, so there is no iOS version.
+  </Accordion>
+
+  <Accordion title="Apple Silicon only">
+    Intel Macs route USB-C through Intel Titan Ridge / JHL9580 Thunderbolt 3 controllers. Apple's IOKit driver for those chips does not expose USB-PD negotiation state or cable e-marker VDOs through any public accessor. There is no path to surface the same information on Intel hardware — this is a hardware and driver limitation, not a software one.
+  </Accordion>
+
+  <Accordion title="Not available on the App Store">
+    App Sandbox — required for Mac App Store distribution — blocks the IOKit reads WhatCable depends on. The app is distributed as a Developer ID–signed, notarised download and via Homebrew Cask instead.
+  </Accordion>
+</AccordionGroup>

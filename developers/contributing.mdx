@@ -1,0 +1,52 @@
+---
+title: "Contributing to WhatCable"
+description: "WhatCable welcomes issues and pull requests. The codebase is small and readable. Learn where to start, how to run tests, and how to submit a PR."
+---
+
+Issues and pull requests are welcome. The codebase is intentionally small and tries to stay readable — the entire diagnostic engine lives in `Sources/WhatCableCore/`, which is a handful of focused Swift files with no external dependencies beyond `Foundation` and `IOKit`.
+
+## Where to start
+
+<CardGroup cols={2}>
+  <Card title="UI changes" icon="paintbrush">
+    Start at `Sources/WhatCable/ContentView.swift` for the SwiftUI popover, menu structure, settings panel, and anything the user sees.
+  </Card>
+  <Card title="Plain-English logic" icon="text">
+    `Sources/WhatCableCore/PortSummary.swift` is where IOKit data becomes the headline string, capability list, and charging description shown in the UI and CLI.
+  </Card>
+  <Card title="VDO bit-twiddling" icon="code">
+    `Sources/WhatCableCore/PDVDO.swift` decodes USB-PD 3.x VDOs — cable speed, current rating, product type — from raw 32-bit words following the PD spec.
+  </Card>
+  <Card title="Diagnostic logic" icon="bolt">
+    `Sources/WhatCableCore/ChargingDiagnostic.swift` identifies the charging bottleneck by comparing the cable's rating, the charger's PDO list, and the negotiated profile.
+  </Card>
+</CardGroup>
+
+## Running tests
+
+```bash
+swift test
+```
+
+The test suite runs automatically as the first step of `./scripts/build-app.sh`, so a passing build implies passing tests. Run it directly during development to get faster feedback.
+
+## Building locally
+
+```bash
+swift run WhatCable       # menu bar app
+swift run whatcable-cli   # CLI
+```
+
+Both commands compile only what has changed since the last build. The menu bar app requires macOS 14 or later and will not launch on earlier versions.
+
+## Submitting a PR
+
+Keep pull requests small and focused on a single concern. A PR that touches `PortSummary.swift` and `PDVDO.swift` for a new VDO decoding fix is easier to review than one that also refactors the UI layout.
+
+**If your change touches IOKit code** — anything in the watcher files or `USBCPort.swift` — please test on real hardware and mention the Mac model (e.g. MacBook Pro M3 Pro, MacBook Air M2) in the PR description. IOKit behaviour varies between chip generations, and the only reliable way to verify watcher correctness is a physical machine with a physical cable.
+
+For bug reports, attach the `--raw` CLI output or the raw properties panel from the menu bar app. That gives maintainers the exact IOKit values needed to reproduce the issue without requiring the same hardware.
+
+<Note>
+  If you want to add a vendor to `VendorDB.swift`, include the official USB-IF Vendor ID (VID) as a hex value and the short common name the brand is recognised by. You can look up registered VIDs in the [USB-IF vendor database](https://www.usb.org/developers). Avoid adding entries that duplicate an existing VID or use a marketing name rather than the manufacturer name.
+</Note>

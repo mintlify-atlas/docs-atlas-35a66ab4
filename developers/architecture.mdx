@@ -1,0 +1,79 @@
+---
+title: "WhatCable codebase architecture"
+description: "WhatCable is built on a shared WhatCableCore library used by both the menu bar app and the CLI. Learn how the three Swift targets fit together."
+---
+
+WhatCable is a Swift package with three executable targets and one shared library. The menu bar app and the CLI are separate binaries but share a single diagnostic engine — `WhatCableCore` — so every capability the UI exposes is also available on the command line, and vice versa.
+
+## Package structure
+
+The `Package.swift` manifest declares four targets:
+
+| Target | Type | Binary name | Depends on |
+|---|---|---|---|
+| `WhatCableCore` | Library | — | (none) |
+| `WhatCable` | Executable | `WhatCable` | `WhatCableCore` |
+| `WhatCableCLI` | Executable | `whatcable-cli` | `WhatCableCore` |
+| `WhatCableTests` | Test | — | `WhatCable`, `WhatCableCore`, `WhatCableCLI` |
+
+`WhatCableCore` carries no UI dependencies. It imports only `Foundation` and `IOKit`, which means it can be tested headlessly and compiled for both targets without pulling in SwiftUI or AppKit.
+
+The `WhatCableCLI` Swift module name differs from its binary product name (`whatcable-cli`) by design. Swift module names must be valid identifiers; the hyphenated binary name follows the convention for command-line tools.
+
+## WhatCableCore modules
+
+Every file in `Sources/WhatCableCore/` has a focused responsibility:
+
+| File | Role |
+|---|---|
+| `USBCPort.swift` | Value type holding per-port IOKit state: connection flags, active transports, plug orientation, e-marker presence, and raw IOKit properties |
+| `USBCPortWatcher.swift` | `ObservableObject` that registers IOKit matching notifications against `AppleHPMInterfaceType10/11/12` (M3-era) and `AppleTCControllerType10` (M1/M2), drains them into `[USBCPort]`, and exposes a `refresh()` method for manual polling |
+| `PowerSource.swift` | Value type for a PDO list: every voltage/current profile a connected charger advertises, plus the live winning profile |
+| `PowerSourceWatcher.swift` | `ObservableObject` that watches `IOPortFeaturePowerSource` services, mapping each one onto a `PowerSource` value and publishing add/remove events |
+| `PDIdentity.swift` | Value type for a PD Discover Identity response — vendor ID, product ID, and raw VDO array — labelled with the SOP endpoint (port partner or cable e-marker) |
+| `PDIdentityWatcher.swift` | `ObservableObject` that watches `IOPortTransportComponentCCUSBPDSOP` services and decodes the VDO payload into `[PDIdentity]` |
+| `PDVDO.swift` | USB-PD 3.x VDO decoder: parses `CableVDO` and `IDHeader` fields from raw 32-bit words to extract cable speed, current rating, and product type |
+| `PortSummary.swift` | Plain-English interpretation layer: takes a `USBCPort`, its `PowerSource`, and its `PDIdentity` values and produces the headline string, charging diagnostic banner, and structured capability list shown in the UI and CLI output |
+| `ChargingDiagnostic.swift` | Bottleneck analyser: compares the cable's current rating, the charger's PDO list, and the negotiated profile to identify what's limiting charging speed |
+| `VendorDB.swift` | Bundled USB-IF vendor name lookup: maps USB Vendor IDs to short human-readable names; unrecognised VIDs fall back to their hex representation |
+| `AppInfo.swift` | Version string and tagline constants, shared by both the menu bar app and the CLI so they always report the same version |
+| `USBDevice.swift` | Value type for a USB device enumeration result |
+| `USBWatcher.swift` | `ObservableObject` that enumerates connected USB devices via IOKit |
+
+## Data flow
+
+The watchers, summary layer, and UI/CLI form a unidirectional pipeline:
+
+```
+IOKit registry
+    │
+    ▼
+USBCPortWatcher   PowerSourceWatcher   PDIdentityWatcher
+    │                    │                     │
+    └──────────┬─────────┘                     │
+               ▼                               │
+         [USBCPort]           [PowerSource]    [PDIdentity]
+               │                    │               │
+               └──────────┬─────────┴───────────────┘
+                           ▼
+                     PortSummary
+                     ChargingDiagnostic
+                           │
+               ┌───────────┴───────────┐
+               ▼                       ▼
+        SwiftUI popover          CLI stdout / JSON
+        (WhatCable target)      (WhatCableCLI target)
+```
+
+Each watcher publishes its state as a `@Published` array. `PortSummary` is a pure function — it takes the three data sources and returns a structured description with no side effects. Both the menu bar app and the CLI call `PortSummary` directly; neither duplicates diagnostic logic.
+
+## Entry points for contributors
+
+If you're new to the codebase, these three files cover the majority of behaviour:
+
+| What you want to change | File |
+|---|---|
+| UI layout, menu structure, settings | `Sources/WhatCable/ContentView.swift` |
+| Plain-English labels, headline logic, capability descriptions | `Sources/WhatCableCore/PortSummary.swift` |
+| VDO bit fields, cable speed decoding, PD spec details | `Sources/WhatCableCore/PDVDO.swift` |
+| Charging bottleneck analysis | `Sources/WhatCableCore/ChargingDiagnostic.swift` |

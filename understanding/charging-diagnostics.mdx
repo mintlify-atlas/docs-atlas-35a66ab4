@@ -1,0 +1,102 @@
+---
+title: "How WhatCable diagnoses charging speed"
+description: "WhatCable compares charger output, cable rating, and the negotiated PDO to identify whether the cable, charger, or Mac is limiting your charging speed."
+---
+
+When you plug in a charger, up to three separate factors determine how fast your Mac actually charges: what the charger can deliver, what the cable can carry, and what the Mac has asked for. Any one of those three can be the bottleneck, and it is not always obvious which. WhatCable reads the live USB-PD state from IOKit and compares all three to surface a plain-English verdict directly in the port popover.
+
+## The bottleneck hierarchy
+
+WhatCable's `ChargingDiagnostic` follows a fixed order of suspicion. It reads `chargerMaxW` from the USB-PD source's advertised PDOs, `cableMaxW` from the cable's e-marker (SOP' identity), and `negotiatedW` from the currently active (winning) PDO.
+
+1. **Cable is the bottleneck** — if the e-marker reports a wattage ceiling below what the charger advertises, the cable is undersized and WhatCable flags it immediately.
+2. **Mac is the bottleneck** — if the negotiated power is more than 5 W below both the charger ceiling and the cable ceiling, the Mac is deliberately asking for less than the hardware can supply. This is normal and expected behaviour.
+3. **Everything is matched** — if the negotiated power is within 5 W of the charger's capability (or the cable is not the constraint), charging is considered fine.
+4. **Negotiation not yet complete** — if there is a USB-PD source but no winning PDO has been recorded yet, WhatCable reports what the charger advertises and waits.
+
+## Diagnostic states
+
+<AccordionGroup>
+  <Accordion title="Cable is limiting charging speed — .cableLimit(cableW:chargerW:)">
+    **When it fires:** the cable's e-marker reports a max wattage that is strictly less than the charger's advertised maximum.
+
+    **What you see:** an orange banner reading "Cable is limiting charging speed" with a detail line such as "Charger can deliver up to 96W, but this cable is only rated to carry 60W. Replace the cable to charge faster."
+
+    **What to do:** replace the cable with one rated at or above the charger's maximum wattage. For a 96 W charger you need a 5 A / 100 W+ cable with an e-marker.
+  </Accordion>
+
+  <Accordion title="Mac is requesting less — .macLimit(negotiatedW:chargerW:cableW:)">
+    **When it fires:** the negotiated power is more than 5 W below both the charger ceiling and the cable ceiling.
+
+    **What you see:** a banner reading "Charging at NW (charger can do up to NW)" with a detail line explaining that both the charger and cable can do more, but the Mac is currently asking for less.
+
+    **What to do:** nothing — this is normal. The Mac deliberately reduces its power request when the battery is mostly full, the display is off, or the system is idle. See [Why the Mac requests less](#why-the-mac-requests-less) below.
+  </Accordion>
+
+  <Accordion title="Charging well — .fine(negotiatedW:)">
+    **When it fires:** the negotiated power is within 5 W of the charger's ceiling (after accounting for any cable constraint), meaning the charger and cable are well-matched to what the Mac is asking for.
+
+    **What you see:** a green banner reading "Charging well at NW".
+
+    **What to do:** nothing. Your setup is working as intended.
+  </Accordion>
+
+  <Accordion title="Charger limit (negotiation pending) — .chargerLimit(chargerW:)">
+    **When it fires:** a USB-PD source is present and advertising PDOs, but no winning (negotiated) PDO has been recorded yet. This typically means the negotiation just started, or the port has stale advertisement data with no active negotiation.
+
+    **What you see:** a banner reading "Charger advertises up to NW" with the note "Negotiation hasn't completed yet."
+
+    **What to do:** wait a moment. If the banner persists, try unplugging and replugging the cable.
+  </Accordion>
+
+  <Accordion title="No charger on this port — .noCharger">
+    **When it fires:** the port has no USB-PD source at all. There is nothing to diagnose.
+
+    **What you see:** no charging diagnostic banner is displayed for this port.
+
+    **What to do:** if you expected to be charging, check that the charger supports USB Power Delivery and that the cable is fully seated.
+  </Accordion>
+</AccordionGroup>
+
+## Why the Mac requests less
+
+The Mac controls how much power it asks for via USB-PD negotiation. It does not always ask for the maximum the hardware can supply, and that is intentional:
+
+- **Battery near full** — at around 80–100% charge, the Mac switches to trickle charge and deliberately requests far less current to protect battery longevity. A 96 W charger may only be asked for 20–30 W.
+- **Idle or sleep** — when the display is off and no intensive work is running, the Mac's power demand drops significantly, and so does its PD request.
+- **Thermal throttling** — in rare cases, heat management inside the Mac can also reduce the requested charge rate.
+
+None of this means anything is broken. The `.macLimit` state is informational, not a warning.
+
+## The 5 W tolerance
+
+The check that distinguishes `.macLimit` from `.fine` includes a 5 W guard:
+
+```swift
+n < chargerMaxW - 5
+```
+
+This tolerance exists to avoid false positives from rounding. USB-PD wattage figures are computed from integer millivolt and milliamp values, and the rounded result can legitimately land a watt or two below the advertised ceiling even when negotiation has completed correctly. Without the guard, a 95 W negotiated draw against a 96 W charger would incorrectly report the Mac as the bottleneck.
+
+## Cached PDO caveat
+
+MagSafe 3 ports (and some USB-C ports) keep the last negotiated PDO in memory even after the charger is unplugged. From IOKit's perspective, the port looks like it is still drawing power at full rate. To avoid showing stale data, `ChargingDiagnostic` gates entirely on `port.connectionActive == true`:
+
+```swift
+guard port.connectionActive == true else { return nil }
+```
+
+If the port is not actively connected, no diagnostic is produced regardless of what the PDO cache contains.
+
+<Warning>
+WhatCable trusts the cable's e-marker chip for the `cableMaxW` value. A counterfeit or mis-flashed cable can advertise a higher wattage than it can actually carry. If a cable claims 100 W but runs hot or charges slowly, the chip is misreporting its capability — WhatCable has no way to detect this through software alone.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="E-marker chips" icon="microchip" href="/understanding/emarker">
+    How WhatCable reads cable current rating from the e-marker
+  </Card>
+  <Card title="USB-PD and PDO profiles" icon="plug" href="/understanding/usb-pd">
+    How WhatCable reads and displays every voltage profile a charger offers
+  </Card>
+</CardGroup>

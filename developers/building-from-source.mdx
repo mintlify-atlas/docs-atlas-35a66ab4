@@ -1,0 +1,110 @@
+---
+title: "Build WhatCable from source"
+description: "Build the WhatCable menu bar app and CLI from source using Swift 5.9 and Xcode 15. Covers local runs, distributable app builds, code signing, and release process."
+---
+
+WhatCable is fully open source. You can clone the repository, run it locally in seconds, or produce a signed and notarised distributable `.app` bundle — the same artifact published to GitHub Releases and the Homebrew cask.
+
+## Prerequisites
+
+- **Swift 5.9** (bundled with Xcode 15 or later)
+- **macOS 14 (Sonoma)** or later
+- Xcode command-line tools: `xcode-select --install`
+
+For distributable builds and releases you also need a valid **Apple Developer ID Application** certificate in your keychain.
+
+## Run locally
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/darrylmorley/whatcable.git
+    cd whatcable
+    ```
+  </Step>
+  <Step title="Run the menu bar app">
+    ```bash
+    swift run WhatCable
+    ```
+    The WhatCable icon appears in your menu bar. Click it to open the popover.
+  </Step>
+  <Step title="Run the CLI">
+    ```bash
+    swift run whatcable-cli
+    ```
+    Prints a human-readable summary of every USB-C port to stdout. Pass `--json`, `--watch`, or `--raw` as needed.
+  </Step>
+</Steps>
+
+## Build a distributable .app
+
+Running the build script produces a universal binary (`arm64 + x86_64`) and packages it into a `.zip` ready for distribution:
+
+```bash
+./scripts/build-app.sh
+```
+
+The script runs the test suite first, then compiles both the menu bar app and CLI, assembles `dist/WhatCable.app`, and creates `dist/WhatCable.zip`. The CLI binary lands in `WhatCable.app/Contents/Helpers/whatcable` — separate from the main `MacOS/` directory to avoid case-insensitive filesystem collisions.
+
+**Signing modes** — the script's behaviour depends on which environment variables are set in `.env`:
+
+| Configuration | Result |
+|---|---|
+| No `.env` present | Ad-hoc signed. Works on your own Mac; Gatekeeper warns on any other machine. |
+| `.env` with `DEVELOPER_ID` | Developer ID signed with hardened runtime. Distributable but not notarised. |
+| `.env` with `DEVELOPER_ID` + `NOTARY_PROFILE` | Full notarisation + stapled ticket. Gatekeeper-clean for everyone. |
+
+## One-time notarisation setup
+
+You only need to do this once per developer machine. After completing these steps, every subsequent `./scripts/build-app.sh` run with a populated `.env` will notarise and staple automatically.
+
+<Steps>
+  <Step title="Find your signing identity">
+    ```bash
+    security find-identity -v -p codesigning
+    ```
+    Look for a line starting with `Developer ID Application:`. Copy the full string including the team ID in parentheses — you'll need it in step 3.
+  </Step>
+  <Step title="Store notarytool credentials in the keychain">
+    ```bash
+    xcrun notarytool store-credentials "WhatCable-notary" \
+        --apple-id "you@example.com" \
+        --team-id "ABCDE12345" \
+        --password "<app-specific-password>"
+    ```
+    Generate the app-specific password at [appleid.apple.com](https://appleid.apple.com). The profile name `"WhatCable-notary"` matches the default `NOTARY_PROFILE` value in `.env.example`.
+  </Step>
+  <Step title="Create your .env file">
+    ```bash
+    cp .env.example .env
+    ```
+    Open `.env` and fill in `DEVELOPER_ID` with the full identity string from step 1. The `NOTARY_PROFILE` field defaults to `"WhatCable-notary"`, which matches the keychain profile you created in step 2.
+  </Step>
+</Steps>
+
+## Cutting a release
+
+Write your release notes to `release-notes/v0.5.3.md` first, then run:
+
+```bash
+./scripts/release.sh 0.5.3
+```
+
+The release script runs the full pipeline end-to-end:
+
+1. Bumps the version in the build script to `0.5.3`
+2. Calls `build-app.sh`, which builds universal binaries, signs, notarises, smoke-tests, and bumps the local Homebrew cask
+3. Tags the commit and pushes to `origin`
+4. Creates a GitHub release with your notes file attached
+5. Verifies the uploaded asset's SHA-256 matches the local zip
+6. Copies the release notes into the Homebrew tap and pushes the tap
+
+Run with `--dry-run` first to validate your environment before touching any remote state:
+
+```bash
+./scripts/release.sh --dry-run 0.5.3
+```
+
+<Note>
+  The release script requires the `gh` CLI to be installed and authenticated (`gh auth login`). It also reads all variables from your `.env` file — at minimum `DEVELOPER_ID`, `NOTARY_PROFILE`, and `TAP_DIR` (the path to your local clone of the `homebrew-whatcable` tap). See `.env.example` for the full list of optional variables.
+</Note>

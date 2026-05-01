@@ -1,0 +1,123 @@
+---
+title: "Understanding USB-C cable e-marker chips"
+description: "An e-marker is a chip inside a USB-C cable plug that advertises speed, current rating, and vendor. WhatCable reads it directly from the PD Discover Identity VDO."
+---
+
+An e-marker (electronically marked cable) is a small chip embedded in one or both plugs of a USB-C cable. Its job is to identify the cable's capabilities to the connected devices via the USB Power Delivery protocol. Without an e-marker, devices must make conservative assumptions about what the cable can carry. With one, they can negotiate the highest power and speed the cable actually supports. Any Thunderbolt or USB4 cable is required to carry an e-marker; so is any cable rated above 60 W (5 A cables). Most cheap charge-only cables do not have one.
+
+## What the e-marker tells WhatCable
+
+WhatCable reads the Cable VDO from the e-marker's Discover Identity response and surfaces four properties.
+
+### Cable speed
+
+The `PDVDO.CableSpeed` enum encodes the maximum signalling rate the cable supports:
+
+| Raw value | `CableSpeed` case | Label shown by WhatCable |
+|---|---|---|
+| `0` | `.usb20` | USB 2.0 (480 Mbps) |
+| `1` | `.usb32Gen1` | USB 3.2 Gen 1 (5 Gbps) |
+| `2` | `.usb32Gen2` | USB 3.2 Gen 2 (10 Gbps) |
+| `3` | `.usb4Gen3` | USB4 Gen 3 (20 / 40 Gbps) |
+| `4` | `.usb4Gen4` | USB4 Gen 4 (80 Gbps) |
+
+<Note>
+The USB4 Gen 3 entry covers both PD 3.0 (which encodes 20 Gbps at this value) and PD 3.1 (which extends it to 40 Gbps). WhatCable displays the label from the spec: "USB4 Gen 3 (20 / 40 Gbps)".
+</Note>
+
+### Current rating
+
+The `PDVDO.CableCurrent` enum encodes the maximum current the cable can carry:
+
+| `CableCurrent` case | Max amps | Typical wattage ceiling |
+|---|---|---|
+| `.usbDefault` | 3 A | Up to 60 W at 20 V |
+| `.threeAmp` | 3 A | Up to 60 W at 20 V, or 90 W at 30 V |
+| `.fiveAmp` | 5 A | Up to 100 W at 20 V, or 240 W at 48 V |
+
+<Tip>
+A 3 A cable is sufficient for most laptops up to 60 W. If your charger is rated above 60 W, you need a 5 A cable to unlock the full charging rate. WhatCable will flag this for you via the charging diagnostic.
+</Tip>
+
+### Maximum voltage
+
+The Cable VDO encodes a "Maximum VBUS Voltage" field in bits 9–10. WhatCable decodes this in `PDVDO.CableVDO.maxVolts`:
+
+| Encoded value | `maxVoltageEncoded` | `maxVolts` result |
+|---|---|---|
+| `0` | 0 | 20 V |
+| `1` | 1 | 30 V |
+| `2` | 2 | 40 V |
+| `3` | 3 | 50 V |
+
+The approximate maximum wattage shown in the bullets — "Cable rated for XA at up to YV (~ZW)" — is calculated by multiplying `maxVolts` by `current.maxAmps`.
+
+### Active vs passive
+
+The Cable VDO also encodes whether the cable is passive (a direct copper path) or active (containing signal-conditioning electronics). WhatCable surfaces this as:
+
+- **Passive cable** — no additional bullet; this is the default.
+- **"Active cable (contains signal-conditioning electronics)"** — added when `CableVDO.cableType == .active`. Active cables are common in long Thunderbolt runs and optical cables.
+
+### Cable vendor
+
+The vendor is read from the ID Header VDO (VDO[0] of the Discover Identity response). WhatCable looks up the 16-bit Vendor ID in its bundled vendor database and shows it as "Cable made by [vendor name]". If the VID is not recognised, the hex value is shown instead.
+
+## How WhatCable reads the e-marker
+
+USB-PD defines distinct communication endpoints called SOP (Start Of Packet) variants:
+
+| Endpoint | Who responds | `PDIdentity.Endpoint` case |
+|---|---|---|
+| SOP | The port partner — the device or charger at the far end | `.sop` |
+| SOP' (SOP Prime) | The cable's near-side plug e-marker | `.sopPrime` |
+| SOP'' (SOP Double Prime) | The cable's far-side plug e-marker (if present) | `.sopDoublePrime` |
+
+The e-marker chip lives in the cable plug, not in the device, so WhatCable specifically queries SOP' (and SOP'' where present) to read cable capabilities. The Cable VDO is always at index 3 of the VDO array in the Discover Identity response (`vdos[3]` in `PDIdentity.cableVDO`).
+
+```swift
+public var cableVDO: PDVDO.CableVDO? {
+    guard endpoint == .sopPrime || endpoint == .sopDoublePrime,
+          vdos.count > 3 else { return nil }
+    let header = idHeader
+    let isActive = header?.ufpProductType == .activeCable
+    return PDVDO.decodeCableVDO(vdos[3], isActive: isActive)
+}
+```
+
+The partner device's identity (product type and vendor) comes from the SOP endpoint and is separate from the cable e-marker data.
+
+## Which cables have an e-marker?
+
+<AccordionGroup>
+  <Accordion title="Always e-marked">
+    - Any Thunderbolt 3, Thunderbolt 4, or USB4 cable
+    - Any cable rated above 60 W — i.e., any 5 A / 100 W+ cable
+  </Accordion>
+
+  <Accordion title="Usually e-marked">
+    - Most quality USB 3.2 Gen 2 (10 Gbps) data cables
+    - Most USB-C cables sold by reputable accessory brands for use with USB4 docks or displays
+  </Accordion>
+
+  <Accordion title="Usually not e-marked">
+    - Cheap charge-only cables rated at 60 W or below
+    - USB 2.0 cables (including most phone charging cables)
+    - Short travel/adapter cables included in the box with phones and earbuds
+  </Accordion>
+</AccordionGroup>
+
+When a cable has no e-marker, WhatCable shows the bullet "Cable does not advertise an e-marker (basic cable)" and omits the cable speed, current, and voltage lines. The port can still report USB transport speeds from the active transport flags — those come from the port controller, not the cable chip.
+
+<Note>
+WhatCable reads what the e-marker chip reports. A counterfeit or incorrectly programmed chip can advertise speeds and wattages the cable cannot actually deliver. If a cable claims 240 W or 40 Gbps but performs poorly, the e-marker chip is misrepresenting the cable's physical construction — WhatCable has no way to verify the cable's internals through software.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Cable types" icon="cable-car" href="/understanding/cable-types">
+    How WhatCable classifies the overall connection status
+  </Card>
+  <Card title="USB-PD and PDO profiles" icon="plug" href="/understanding/usb-pd">
+    How WhatCable reads every voltage profile a charger offers
+  </Card>
+</CardGroup>

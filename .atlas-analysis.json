@@ -1,0 +1,84 @@
+{
+  "projectType": "general",
+  "projectName": "WhatCable",
+  "projectDescription": "A macOS menu bar app and CLI tool that reads USB-C port data via IOKit to tell you in plain English what each cable can do — speed, power, e-marker details, and charging diagnostics.",
+  "theme": "almond",
+  "primaryColor": "#848c8e",
+  "lightColor": "#11161e",
+  "darkColor": "#cfd0d2",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Using WhatCable",
+            "pages": [
+              "using/menu-bar-app",
+              "using/cli",
+              "using/settings"
+            ]
+          },
+          {
+            "group": "Understanding the Data",
+            "pages": [
+              "understanding/cable-types",
+              "understanding/charging-diagnostics",
+              "understanding/emarker",
+              "understanding/usb-pd"
+            ]
+          },
+          {
+            "group": "For Developers",
+            "pages": [
+              "developers/building-from-source",
+              "developers/architecture",
+              "developers/iokit-services",
+              "developers/contributing"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/caveats",
+              "reference/faq",
+              "reference/changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Per-port plain-English cable diagnosis (Thunderbolt, USB4, USB 3.x, charge-only, slow cable)",
+    "Charging bottleneck identification (cable limit, charger limit, or Mac throttling)",
+    "Cable e-marker decoding: speed (up to 80 Gbps), current rating (up to 5A/240W), vendor",
+    "Full USB-PD charger PDO list with live negotiated profile highlighted",
+    "Connected device identity from PD Discover Identity VDOs",
+    "Active transport breakdown (USB 2, USB 3, Thunderbolt, DisplayPort)",
+    "Raw IOKit property inspector (⌥-click or Settings toggle)",
+    "CLI with text, JSON, and --watch streaming modes",
+    "Auto-update, launch-at-login, hide-empty-ports, Dock/menu-bar toggle",
+    "Universal binary (Apple Silicon + Intel app shell), Apple-notarised"
+  ],
+  "publicApiSurface": [
+    "USBCPort — per-port IOKit state struct",
+    "PortSummary — plain-English interpretation of a USBCPort",
+    "ChargingDiagnostic — bottleneck analysis (cableLimit, macLimit, fine, etc.)",
+    "PowerSource / PowerOption — PDO list and winning negotiated profile",
+    "PDIdentity / PDVDO — PD Discover Identity VDO decoder (CableVDO, IDHeader)",
+    "VendorDB.label(for:) — USB-IF vendor name lookup",
+    "USBCPortWatcher — ObservableObject streaming port updates",
+    "PowerSourceWatcher — ObservableObject streaming PDO updates",
+    "PDIdentityWatcher — ObservableObject streaming identity updates",
+    "whatcable CLI: --watch, --json, --raw, --version, --help"
+  ]
+}

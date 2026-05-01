@@ -1,0 +1,90 @@
+---
+title: "USB Power Delivery and charger PDO profiles"
+description: "WhatCable reads the full PDO list from IOPortFeaturePowerSource, showing every voltage profile a charger offers and which one is currently active."
+---
+
+USB Power Delivery (USB-PD) is the protocol that allows a charger and a device to negotiate how much power to use, rather than being locked to a fixed voltage. A modern USB-C charger typically supports several voltage levels — 5 V, 9 V, 15 V, 20 V, and sometimes higher — and the device picks the combination of voltage and current that suits it best. WhatCable reads the full PDO list from IOKit and surfaces every profile the charger advertises, so you can see exactly what the charger is capable of and which profile your Mac is currently using.
+
+## What is a PDO?
+
+A PDO (Power Data Object) is a single voltage and current profile that a charger can deliver. Each PDO describes one operating point: a voltage, a maximum current, and therefore a maximum wattage. A charger advertises multiple PDOs to give the connected device options. For example:
+
+| Voltage | Max current | Max wattage |
+|---|---|---|
+| 5 V | 3 A | 15 W |
+| 9 V | 3 A | 27 W |
+| 15 V | 3 A | 45 W |
+| 20 V | 4.8 A | 96 W |
+
+The device picks one PDO and sends a Request message back to the charger. The agreed profile is called the **winning** or **negotiated** PDO. Everything else in the list remains available but unused until the device re-negotiates.
+
+## The PDO list in WhatCable
+
+WhatCable reads all PDOs from the `IOPortFeaturePowerSource` IOKit service and stores them in a `PowerSource` object. The PDOs are sorted by voltage ascending so you can read from lowest to highest. The currently active (negotiated) PDO is marked in the UI with a green checkmark. All other PDOs are shown greyed out as alternatives the charger supports but is not currently using.
+
+## PowerSource data model
+
+WhatCable models the charger data with two Swift structs from `PowerSource.swift`.
+
+### `PowerOption`
+
+Each PDO maps to one `PowerOption`:
+
+| Field | Type | Description |
+|---|---|---|
+| `voltageMV` | `Int` | Voltage in millivolts (e.g. `20000` for 20 V) |
+| `maxCurrentMA` | `Int` | Maximum current in milliamps (e.g. `4800` for 4.8 A) |
+| `maxPowerMW` | `Int` | Maximum power in milliwatts (e.g. `96000` for 96 W) |
+
+`PowerOption` also provides three formatted label helpers — `voltsLabel`, `ampsLabel`, and `wattsLabel` — that WhatCable uses when building the "Currently negotiated: XV @ YA (ZW)" bullet in the port summary.
+
+### `PowerSource`
+
+A `PowerSource` groups all the PDOs from one charger on one port:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `String` | `"USB-PD"` for a USB-C charger, `"Brick ID"` for a MagSafe brick |
+| `options` | `[PowerOption]` | The full list of PDOs the charger advertises |
+| `winning` | `PowerOption?` | The currently negotiated PDO, or `nil` if negotiation has not completed |
+| `maxPowerMW` | `Int` | The highest `maxPowerMW` across all `options`; falls back to `winning.maxPowerMW` if `options` is empty |
+| `parentPortType` | `Int` | `0x2` = USB-C port, `0x11` = MagSafe 3 port |
+| `parentPortNumber` | `Int` | The port index, used to match this source to its `USBCPort` |
+
+A single port can have more than one `PowerSource` — for example, a MagSafe port may surface both a `"USB-PD"` entry and a `"Brick ID"` entry simultaneously. WhatCable uses the `"USB-PD"` source for all diagnostic purposes.
+
+## Typical PDO set — a 96 W charger
+
+Here is what a typical 96 W GaN USB-C charger advertises, and how WhatCable presents it:
+
+| Voltage | Max current | Max wattage | Status |
+|---|---|---|---|
+| 5 V | 3 A | 15 W | Available |
+| 9 V | 3 A | 27 W | Available |
+| 15 V | 3 A | 45 W | Available |
+| 20 V | 4.8 A | 96 W | **Active (negotiated)** |
+
+With a MacBook Pro plugged in and charging from near-empty, the Mac requests 20 V / 4.8 A and the winning PDO is 96 W. WhatCable shows the headline "Thunderbolt / USB4 · 96W charger" and the bullet "Currently negotiated: 20V @ 4.80A (96W)".
+
+## Why the negotiated power might be lower
+
+The Mac does not always ask for the maximum the charger can supply. Several normal conditions cause it to negotiate a lower PDO or a lower current within a PDO:
+
+- Battery near full: the Mac switches to trickle charge and requests far less current.
+- Display off or system idle: power demand drops, and the Mac may select a lower PDO accordingly.
+- Thermal management: the Mac may reduce its request rate to manage heat.
+
+WhatCable identifies this situation and labels it clearly. See [How WhatCable diagnoses charging speed](/understanding/charging-diagnostics) for a full explanation.
+
+## PD spec version note
+
+WhatCable's decoder targets PD 3.0 and PD 3.1. These cover the vast majority of chargers and cables in current use. PD 3.2 introduced Extended Power Range (EPR) profiles with voltages up to 48 V and wattages up to 240 W; the decoder may need updates as EPR hardware becomes more common and Apple exposes EPR PDOs through IOKit.
+
+<CardGroup cols={2}>
+  <Card title="Charging diagnostics" icon="bolt" href="/understanding/charging-diagnostics">
+    How WhatCable identifies which party is limiting your charging speed
+  </Card>
+  <Card title="E-marker chips" icon="microchip" href="/understanding/emarker">
+    How WhatCable reads cable current rating from the e-marker chip
+  </Card>
+</CardGroup>

@@ -1,0 +1,112 @@
+---
+title: "Reading the WhatCable menu bar popover"
+description: "Walk through every section of the WhatCable popover: port cards, status headlines, charging diagnostics, e-marker bullets, PDO profiles, and the raw IOKit view."
+---
+
+Click the WhatCable icon in your menu bar to open the popover. You'll see one card per USB-C port on your Mac, each delivering a plain-English verdict on the cable or device plugged into it — drawn live from IOKit. The popover updates automatically as you connect and disconnect cables, and you can force an immediate refresh using the button in the header.
+
+## Port card anatomy
+
+Each port is displayed as a rounded card. The card contains several layers of information, from the quick-glance headline at the top down to the optional PDO profile list at the bottom.
+
+### Port label
+
+The small caption above the headline identifies the port. WhatCable uses the human-readable `portDescription` string from IOKit (for example, `Port-USB-C@1` or `Thunderbolt 4 Port`). If no description is available it falls back to the IOKit service name.
+
+### Status icon and headline
+
+A large icon on the left reflects the current port state at a glance. Immediately to the right, the headline gives you the one-line verdict in plain English. See [Status headlines](#status-headlines) below for the full set of values and what each one means.
+
+### Subtitle
+
+A single sentence below the headline adds context — for example whether a data link is active, whether only power is flowing, or what the headline condition means in practice.
+
+### Bullet list
+
+When a cable or device is connected, WhatCable expands a bullet list with everything it decoded from IOKit and the PD identity response:
+
+- **Link speed** — whether Thunderbolt / USB4, SuperSpeed USB (5 Gbps or faster), or USB 2.0 only.
+- **DisplayPort** — whether the port is carrying DisplayPort video over alt mode.
+- **E-marker** — whether the cable contains an e-marker chip that advertises its own capabilities; or, if no e-marker is present, that the cable is a basic one.
+- **Charger wattage** — the maximum wattage the connected charger advertises across all its PDO profiles.
+- **Negotiated PDO** — the voltage, current, and wattage the Mac has actually asked for right now (e.g. `20V @ 3.25A — 65W`).
+- **Cable speed and ratings** — decoded from the cable e-marker SOP′ VDO: speed (e.g. USB 2.0, 40 Gbps), current rating (3 A / 5 A / up to 240 W), and maximum voltage.
+- **Active cable** — noted if the cable contains signal-conditioning electronics.
+- **Optical cable** — noted if the cable is an optical active cable.
+- **Connected device type and vendor** — decoded from the PD Discover Identity SOP response (e.g. `Hub — Anker`).
+- **Cable vendor** — the manufacturer name or VID decoded from the e-marker SOP′ response.
+
+### Charging diagnostic banner
+
+When a charger is connected, a coloured banner appears below the bullet list:
+
+- **Orange / warning** — something is limiting charging speed. The summary line names the bottleneck (for example, *"Cable is limiting charging speed"*) and the detail line explains why.
+- **Green / positive** — everything is matched up well, for example *"Charging well at 96W"*.
+
+The banner shows the `summary` and `detail` strings from `ChargingDiagnostic`, so the wording reflects the actual negotiated state rather than a generic message.
+
+### PDO profile list
+
+If the connected source advertises multiple Power Delivery Object (PDO) profiles, they appear as a list sorted by voltage. Each row shows voltage, current, and wattage (e.g. `20V @ 4.50A — 90W`). The profile the Mac is currently using has a green checkmark and an **active** badge next to it; all other profiles show an empty circle.
+
+## Status headlines
+
+The headline on each port card maps to one of the following states, determined by which transports are active and whether a power source is present.
+
+| Headline | What it means |
+|---|---|
+| **Thunderbolt / USB4** | The Converged I/O (Thunderbolt) transport is active. This is the fastest connection class. A wattage suffix (e.g. `· 96W charger`) is appended when a charger is also present. |
+| **USB-C with video** | SuperSpeed USB and DisplayPort alt mode are both active — a data cable driving an external display. |
+| **Display connected** | DisplayPort alt mode is active but no SuperSpeed data link is established. |
+| **USB device** | A SuperSpeed (USB 3.x) data link is active but no DisplayPort or Thunderbolt. |
+| **Slow USB device or charge-only cable** | Only USB 2.0 is active. If you expected high-speed data, the cable likely does not support SuperSpeed. |
+| **Charging** | A USB-PD power source is present and power is flowing, but no data link is established. |
+| **Charging only** | Power is flowing (USB2 is supported on the port) but no data link has been established. |
+| **Connected** | Something is plugged in, but WhatCable could not determine the cable type from the available IOKit data. |
+| **Nothing connected** | No connection is active on this port. |
+
+## Header controls
+
+The popover header contains two icon buttons on the right side:
+
+- **Refresh** (`arrow.clockwise`) — triggers an immediate re-read of all IOKit watchers. Use this if you just plugged in a cable and the card hasn't updated yet.
+- **Settings** (`gearshape`) — replaces the popover content with the [Settings panel](/using/settings).
+
+## Footer
+
+The footer shows two pieces of information separated by a centred dot:
+
+- The count of USB devices currently detected system-wide (e.g. `3 USB devices`).
+- The app version and credit string (e.g. `v0.5.3 · WhatCable`).
+
+## Right-click menu
+
+Right-clicking the WhatCable menu bar icon opens a context menu with the following items:
+
+| Item | What it does |
+|---|---|
+| **Refresh** | Re-reads all ports immediately, same as the button in the header. |
+| **Keep window open** | Toggles whether the popover stays visible after you click away — useful for screenshots and demos. |
+| **Check for Updates…** | Queries the GitHub Releases API for a newer version. |
+| **About** | Shows the standard macOS About panel with version and build info. |
+| **WhatCable on GitHub** | Opens the repository in your default browser. |
+| **Quit** | Quits WhatCable. |
+
+## Option-click: raw IOKit view
+
+Hold **⌥ (Option)** while clicking the menu bar icon to toggle the advanced view. When it's on, each port card expands with a structured IOKit section showing:
+
+- **Connection** — active flag, e-marker chip presence, optical cable flag, USB active, SuperSpeed active, and plug event count.
+- **Transports** — the supported, provisioned, and currently active transport list.
+- **All raw IOKit properties** — an expandable disclosure group listing every key/value pair from the port's IOKit property dictionary, with values selectable for copying.
+
+You can also enable this view permanently from the **Show technical details** toggle in [Settings](/using/settings).
+
+## Update banner
+
+When WhatCable detects a newer release on GitHub, an update banner appears between the header and the first port card. The banner shows the new version number, your current version, and one or two action buttons:
+
+- **View release** — opens the GitHub release page in your browser.
+- **Install update** — downloads, verifies the signature, and installs the update in place; WhatCable relaunches automatically.
+
+While the download or install is in progress the buttons are replaced by a spinner, and the status line updates to reflect the current step (`Downloading…`, `Verifying signature…`, `Installing — WhatCable will relaunch`). If the install fails, an error message appears inline and the buttons return.

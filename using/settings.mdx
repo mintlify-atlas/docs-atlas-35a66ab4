@@ -1,0 +1,72 @@
+---
+title: "WhatCable settings and preferences"
+description: "Configure WhatCable to hide empty ports, launch at login, switch between menu bar and Dock mode, and enable cable-change notifications."
+---
+
+To open Settings, click the **gear icon** (`gearshape`) in the top-right corner of the WhatCable popover. The popover content is replaced by the Settings panel. Click **Done** (or press Return) to go back to the port list.
+
+Settings are grouped into three sections: **Display**, **Behavior**, and **Notifications**.
+
+## Display
+
+<AccordionGroup>
+  <Accordion title="Show technical details">
+    Expands every port card with a structured IOKit section showing connection flags, transport lists, and a full raw property dictionary. This is the same view you get by holding **⌥ (Option)** while clicking the menu bar icon.
+
+    This setting is ephemeral — it resets to off each time WhatCable launches. Use it when you want to inspect IOKit data in the current session without making the advanced view permanent.
+  </Accordion>
+
+  <Accordion title="Hide empty ports">
+    When enabled, port cards where no cable is connected (`connectionActive == false`) are hidden from the popover. Only ports with an active connection are shown.
+
+    This is useful on Macs with four or more USB-C ports when you only care about what's currently plugged in.
+
+    If you enable this setting and then unplug everything, the popover shows a *"Nothing connected"* state rather than a blank list. Disabling the setting immediately restores all port cards.
+  </Accordion>
+</AccordionGroup>
+
+## Behavior
+
+<AccordionGroup>
+  <Accordion title="Launch at login">
+    Registers or unregisters WhatCable with `SMAppService` so it starts automatically when you log in to your Mac. The toggle reflects the actual system registration state — if another tool or macOS Login Items changes the registration outside of WhatCable, the toggle updates to match the next time Settings is opened.
+
+    If registration fails (for example, due to a system permission error), WhatCable rolls the toggle back to its previous state so the UI stays accurate.
+  </Accordion>
+
+  <Accordion title="Show in menu bar">
+    Controls whether WhatCable runs as a menu bar app or as a regular Dock app.
+
+    - **On (default):** WhatCable lives in the menu bar with no Dock icon. Click the icon to open the popover.
+    - **Off:** WhatCable shows a Dock icon and opens a standard window instead of a popover.
+
+    The helper text below the toggle updates to describe the current mode. Changes take effect the next time you launch WhatCable.
+  </Accordion>
+</AccordionGroup>
+
+## Notifications
+
+<AccordionGroup>
+  <Accordion title="Notify on cable changes">
+    Sends a macOS notification when a cable is connected or disconnected on any USB-C port. When you enable this toggle for the first time, WhatCable requests notification permission from macOS. If you deny the request, notifications will not fire until you grant permission in **System Settings → Notifications → WhatCable**.
+
+    This setting defaults to off to avoid noise. Enable it when you want a background alert — for example, to know when a dock or charger drops its connection.
+  </Accordion>
+</AccordionGroup>
+
+## Right-click menu options
+
+These options are not in the Settings panel — they live in the context menu that appears when you **right-click the WhatCable menu bar icon**:
+
+| Option | Description |
+|---|---|
+| **Refresh** | Re-reads all IOKit port data immediately. |
+| **Keep window open** | Pins the popover so it stays visible after you click away. Useful for screenshots and demos. |
+| **Check for Updates…** | Queries the GitHub Releases API for a newer version. |
+| **About** | Shows the standard macOS About panel. |
+| **WhatCable on GitHub** | Opens the repository in your default browser. |
+| **Quit** | Quits WhatCable. |
+
+<Note>
+Hold **⌥ (Option)** while clicking the menu bar icon to toggle the raw IOKit view without opening Settings. This is equivalent to the **Show technical details** toggle in the Display section, but applies only for the current session.
+</Note>

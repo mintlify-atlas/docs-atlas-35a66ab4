@@ -1,133 +1,78 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
-icon: 'star'
+title: "WhatCable: Know what every USB-C cable can do"
+description: "WhatCable is a macOS menu bar app and CLI that reads your USB-C ports via IOKit and tells you in plain English what each cable can actually do."
 ---
 
-## Setting up
+WhatCable surfaces everything your Mac already knows about each USB-C port — cable speed, power capacity, e-marker details, and exactly why you might be charging slowly — all in a friendly menu bar popover or from the terminal.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Download the app or install via Homebrew in seconds.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running and reading your first port in under a minute.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Menu bar app" icon="display" href="/using/menu-bar-app">
+    Learn what each section of the popover shows you.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="CLI reference" icon="terminal" href="/using/cli">
+    Use `whatcable` in scripts, with JSON output, or in watch mode.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What WhatCable tells you
 
-Everything you need to create world-class documentation.
+Every USB-C cable looks identical from the outside, but carries wildly different capabilities — from USB 2.0 charge-only to 240 W / 80 Gbps Thunderbolt 4. WhatCable reads three families of IOKit services on Apple Silicon Macs to give you a complete picture per port.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Cable types explained" icon="cable-car" href="/understanding/cable-types">
+    Understand what Thunderbolt, USB4, and USB 2.0 mean in practice.
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Charging diagnostics" icon="bolt" href="/understanding/charging-diagnostics">
+    Find out which part of your setup is limiting charging speed.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="E-marker chips" icon="microchip" href="/understanding/emarker">
+    Learn what the e-marker chip inside a cable advertises.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="USB Power Delivery" icon="plug" href="/understanding/usb-pd">
+    Understand PDOs, voltage profiles, and the negotiation process.
   </Card>
-</Columns>
+</CardGroup>
 
-## Make your content agent ready
+## For developers
 
-Make your docs work for humans and AI agents alike.
+WhatCable is open source, MIT-licensed, and built on a shared `WhatCableCore` library used by both the menu bar app and the CLI.
 
-<Columns cols={2}>
-  <Card
-    title="Prompt component"
-    icon="robot"
-    href="/agent-ready/prompt"
-  >
-    Embed shareable AI prompts readers can copy or open in Cursor.
+<CardGroup cols={2}>
+  <Card title="Build from source" icon="hammer" href="/developers/building-from-source">
+    Build, sign, and notarise WhatCable yourself with Swift 5.9+.
   </Card>
-  <Card
-    title="Visibility"
-    icon="eye"
-    href="/agent-ready/visibility"
-  >
-    Show different content to humans and agents reading your docs.
+  <Card title="Architecture" icon="sitemap" href="/developers/architecture">
+    Explore how WhatCableCore, the app, and the CLI fit together.
   </Card>
-  <Card
-    title="Contextual menu"
-    icon="bolt"
-    href="/agent-ready/contextual"
-  >
-    Give readers one-click access to Claude, ChatGPT, Cursor, and more.
+  <Card title="IOKit services" icon="server" href="/developers/iokit-services">
+    The three IOKit service families WhatCable queries.
   </Card>
-  <Card
-    title="AI coding tools"
-    icon="wand-magic-sparkles"
-    href="/ai-tools/claude-code"
-  >
-    Set up Claude Code, Cursor, or Windsurf with Mintlify's skill.
+  <Card title="Contributing" icon="code-pull-request" href="/developers/contributing">
+    Issues and PRs welcome — start here.
   </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+<Steps>
+  <Step title="Install WhatCable">
+    Download from the [Releases page](https://github.com/darrylmorley/whatcable/releases/latest) or run `brew install --cask whatcable`.
+  </Step>
+  <Step title="Click the menu bar icon">
+    A popover opens showing every USB-C port on your Mac and what is currently plugged in.
+  </Step>
+  <Step title="Plug in a cable">
+    The port card updates in real time, showing cable speed, power capacity, and a charging diagnostic.
+  </Step>
+  <Step title="Use the CLI (optional)">
+    Run `whatcable --json | jq` from your terminal for structured output you can pipe into scripts.
+  </Step>
+</Steps>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Note>
+WhatCable requires macOS 14 (Sonoma) or later and an Apple Silicon Mac. Intel Macs are not supported because the Thunderbolt 3 controller on Intel hardware does not expose USB-PD negotiation state through any public IOKit accessor.
+</Note>

@@ -1,0 +1,81 @@
+---
+title: "Cable types WhatCable recognises"
+description: "WhatCable identifies seven cable and port states from Thunderbolt/USB4 down to charge-only. Learn what each status headline means and how it is determined."
+---
+
+USB-C hides an enormous range of capability under a single connector shape. The cable in your drawer might carry Thunderbolt 4 at 40 Gbps and 100 W, or it might be a cheap charge-only lead that tops out at USB 2.0 and 15 W — both look identical on the outside. WhatCable reads the live IOKit state of each port and gives you a plain-English verdict so you always know what you actually have.
+
+## Status classification
+
+Every port is assigned one of six statuses. The table below maps each `PortSummary.Status` value to the headline WhatCable displays and the condition that triggers it.
+
+| `Status` value | Headline shown | Triggered when |
+|---|---|---|
+| `.thunderboltCable` | "Thunderbolt / USB4" | `CIO` (Converged I/O) transport is active on the port |
+| `.displayCable` | "USB-C with video" | USB 3 SuperSpeed **and** DisplayPort are both active |
+| `.displayCable` | "Display connected" | DisplayPort is active but USB 3 is not |
+| `.dataDevice` | "USB device" | USB 3 SuperSpeed is active, no DisplayPort |
+| `.dataDevice` | "Slow USB device or charge-only cable" | Only USB 2 is active (no SuperSpeed) |
+| `.charging` | "Charging" | A USB-PD source is present but no data transport is active |
+| `.charging` | "Charging only" | No active transports at all, but the port supports USB 2 |
+| `.unknown` | "Connected" | Something is connected but the port state could not be interpreted |
+| `.empty` | "Nothing connected" | `connectionActive` is `false` |
+
+When a charger is also present, WhatCable appends a wattage suffix to the headline — for example, "Thunderbolt / USB4 · 96W charger" — provided the USB-PD source advertises at least one PDO with a non-zero wattage.
+
+## Transport flags
+
+WhatCable reads the `transportsActive` array from `USBCPort` and checks for four named transport strings:
+
+| Transport string | What it means |
+|---|---|
+| `"USB2"` | USB 2.0 (High Speed, 480 Mbps) is active |
+| `"USB3"` | USB 3 SuperSpeed (5 Gbps or faster) is active — also set when `superSpeedActive == true` |
+| `"CIO"` | Converged I/O — Apple's IOKit name for Thunderbolt / USB4 |
+| `"DisplayPort"` | DisplayPort Alternate Mode is active; the cable is carrying video |
+
+A transport appearing in `transportsActive` means the link is currently live at that level, not merely that the port or cable supports it in theory.
+
+## How WhatCable decides
+
+`PortSummary.init(port:sources:identities:)` walks through a priority chain to assign a status. In plain English:
+
+1. **Nothing connected** — if `port.connectionActive` is `false`, status is `.empty` immediately. No further checks run.
+2. **Thunderbolt / USB4** — if `CIO` is in `transportsActive`, status is `.thunderboltCable`. This is the highest tier and takes priority over everything else.
+3. **USB-C with video** — if both `USB3` and `DisplayPort` are active, status is `.displayCable` with headline "USB-C with video".
+4. **Display connected** — if `DisplayPort` is active but `USB3` is not, status is `.displayCable` with headline "Display connected".
+5. **USB device** — if `USB3` is active (no DisplayPort), status is `.dataDevice` with headline "USB device".
+6. **Slow USB / charge-only** — if `USB2` is active but `USB3` is not, status is `.dataDevice` with headline "Slow USB device or charge-only cable".
+7. **Charging (PD)** — if a USB-PD power source is present but no transport flags fired, status is `.charging` with headline "Charging".
+8. **Charging only** — if `transportsActive` is empty but the port lists `USB2` in `transportsSupported`, status is `.charging` with headline "Charging only".
+9. **Connected (fallback)** — if none of the above match, status is `.unknown` with headline "Connected".
+
+## What the bullets tell you
+
+Below the headline and subtitle, WhatCable renders a list of bullets describing everything it knows about the current connection. Each bullet has a fixed meaning:
+
+| Bullet text | Meaning |
+|---|---|
+| "Thunderbolt / USB4 link active" | `CIO` is in `transportsActive` |
+| "SuperSpeed USB (5 Gbps or faster)" | `USB3` is active but `CIO` is not |
+| "USB 2.0 only (480 Mbps) — no high-speed data" | `USB2` is active, `USB3` is not |
+| "Carrying DisplayPort video" | `DisplayPort` is in `transportsActive` |
+| "Cable has an e-marker chip (advertises its capabilities)" | `port.activeCable == true` |
+| "Cable does not advertise an e-marker (basic cable)" | `activeCable` is not set, but there are active transports |
+| "Optical cable" | `port.opticalCable == true` |
+| "Active cable (contains signal-conditioning electronics)" | E-marker reports `cableType == .active` |
+| "Charger advertises up to NW" | USB-PD source has PDOs with a non-zero max wattage |
+| "Currently negotiated: XV @ YA (ZW)" | The winning (active) PDO from the USB-PD source |
+| "Cable speed: …" | Speed string from the e-marker's `CableVDO.speed.label` |
+| "Cable rated for XA at up to YV (~ZW)" | Current and voltage ceiling from the e-marker's `CableVDO` |
+| "Connected device: [type] — [vendor]" | Product type and vendor decoded from the SOP Discover Identity response |
+| "Cable made by [vendor]" | Vendor decoded from the SOP' (cable e-marker) Discover Identity response |
+
+<CardGroup cols={2}>
+  <Card title="E-marker chips" icon="microchip" href="/understanding/emarker">
+    How WhatCable reads cable speed and current rating from the e-marker chip
+  </Card>
+  <Card title="Charging diagnostics" icon="bolt" href="/understanding/charging-diagnostics">
+    How WhatCable identifies which of the three parties is limiting your charging speed
+  </Card>
+</CardGroup>

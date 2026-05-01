@@ -1,0 +1,39 @@
+---
+title: "IOKit services WhatCable queries"
+description: "WhatCable reads three IOKit service families on Apple Silicon Macs. No private APIs, no entitlements, no helper daemons — just public IOKit accessors."
+---
+
+WhatCable requires no special entitlements and ships no helper daemons. Everything it surfaces — port state, charger PDO lists, and cable e-marker identity — comes from three families of public IOKit services that macOS exposes on Apple Silicon Macs.
+
+## Service families
+
+| Service | IOKit class name(s) | What it provides |
+|---|---|---|
+| Port state | `AppleHPMInterfaceType10`, `AppleHPMInterfaceType11`, `AppleHPMInterfaceType12` (M3-era); `AppleTCControllerType10` (M1/M2) | Per-port connection state, active transports (USB 2 / USB 3 / Thunderbolt / DisplayPort), plug orientation, e-marker presence, port type description |
+| Power sources | `IOPortFeaturePowerSource` | Full PDO list advertised by the connected charger, plus the live "winning" PDO — the voltage and current profile currently negotiated between the Mac and the charger |
+| PD identity | `IOPortTransportComponentCCUSBPDSOP` | PD Discover Identity VDOs for the port partner (SOP) and the cable e-marker chip (SOP') — vendor ID, product type, cable speed, and current rating |
+
+`USBCPortWatcher` registers matching notifications against all four port-controller class names simultaneously, so WhatCable works correctly across M1, M2, and M3 families without any chip-detection logic. `PowerSourceWatcher` and `PDIdentityWatcher` handle add and remove notifications for their respective service classes, keeping the published state in sync as cables are connected and disconnected.
+
+## Why no private APIs
+
+All three service classes are discoverable through standard IOKit iteration — `IOServiceMatching` followed by `IOServiceAddMatchingNotification` or `IOServiceGetMatchingServices`. WhatCable reads service properties with `IORegistryEntryCreateCFProperties`, which is a fully public API documented in Apple's IOKit framework headers. There are no private framework imports, no `dlopen` calls, no undocumented selectors, and no XPC helpers. The entitlements file (`scripts/WhatCable.entitlements`) contains only the hardened-runtime entitlements required by the code-signing process.
+
+## Why not on Intel
+
+Intel Macs route USB-C through Intel Titan Ridge / JHL9580 Thunderbolt 3 controllers. Apple's IOKit driver for those chips does not expose USB-PD negotiation state, PDO lists, or cable e-marker VDOs through any public accessor. The `AppleHPMInterface` and `IOPortFeaturePowerSource` service classes simply do not appear on Intel hardware. There is no workaround in software — the data is not available from any public path on those machines.
+
+## Why not on the App Store
+
+The App Sandbox restricts the IOKit reads that WhatCable depends on. A sandboxed process cannot iterate arbitrary IOKit services or read their registry properties without an entitlement that Apple does not grant to App Store submissions. WhatCable is distributed as a Developer ID signed and notarised application outside the App Store for this reason.
+
+## Raw properties
+
+Every `USBCPort` value exposes a `rawProperties` dictionary that captures all IOKit properties for that service entry as strings. This is the same data the watcher reads, before any interpretation layer is applied. You can inspect it two ways:
+
+- **Menu bar app:** hold ⌥ (Option) and click the menu bar icon, or enable the toggle in Settings, to reveal a raw properties panel in the popover for each port.
+- **CLI:** pass `--raw` to include the raw properties block in stdout output alongside the human-readable summary.
+
+<Tip>
+  Raw properties are useful when you encounter a cable or charger whose behaviour WhatCable misreports. Including the `--raw` output in a bug report gives maintainers the exact IOKit values needed to reproduce and fix the issue.
+</Tip>

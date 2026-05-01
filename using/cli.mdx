@@ -1,0 +1,203 @@
+---
+title: "Using the whatcable CLI"
+description: "Run whatcable from the terminal for human-readable port summaries, structured JSON output, or live --watch streaming as cables are connected and disconnected."
+---
+
+The `whatcable` CLI runs in your terminal and uses the same diagnostic engine as the menu bar app. Every headline, bullet point, and charging diagnostic you see in the popover comes from the same `WhatCableCore` library that powers the CLI — so the output is identical whether you're reading a popover card or piping JSON into `jq`.
+
+## Installation
+
+If you installed WhatCable via Homebrew, the CLI is already in your `PATH`:
+
+```bash
+brew tap darrylmorley/whatcable
+brew install --cask whatcable
+```
+
+If you installed the `.app` manually by dragging it to `/Applications`, the binary lives inside the app bundle. Symlink it into your `PATH` to use it from the shell:
+
+```bash
+ln -s /Applications/WhatCable.app/Contents/Helpers/whatcable /usr/local/bin/whatcable
+```
+
+## Commands reference
+
+| Command | Description |
+|---|---|
+| `whatcable` | Human-readable summary of every port |
+| `whatcable --json` | Structured JSON output |
+| `whatcable --watch` | Stream updates as cables come and go (Ctrl+C to exit) |
+| `whatcable --raw` | Include underlying IOKit properties |
+| `whatcable --version` | Print version and exit |
+| `whatcable --help` or `-h` | Show help text and exit |
+
+## Default text output
+
+Running `whatcable` with no flags prints a human-readable block for each port. Each block starts with a bold cyan header line containing the port label (e.g. `Port-USB-C@1`) and, where available, the port type in parentheses. Below the header, the output mirrors the structure of a popover card:
+
+- A **headline** line, colour-coded by status (magenta for Thunderbolt, cyan for display, blue for data, yellow for charging or unknown, grey for empty).
+- A **subtitle** line in dim text.
+- A **bullet list** with speed, DisplayPort, e-marker, charger wattage, negotiated PDO, cable speed and ratings, connected device identity, and cable vendor — one bullet per line, indented with `•`.
+- A **charging diagnostic** block (if a charger is present), with a bold `Charging:` label followed by the summary and detail lines.
+
+Ports are separated by a blank line. If no USB-C or MagSafe ports are found, a single line is printed: `No USB-C / MagSafe ports were found on this Mac.`
+
+```bash
+whatcable
+```
+
+Example output (two ports):
+
+```
+=== Port-USB-C@1 (Thunderbolt 4) ===
+Thunderbolt / USB4 · 96W charger
+Supports high-speed data, smart cable.
+
+  • Thunderbolt / USB4 link active
+  • Carrying DisplayPort video
+  • Cable has an e-marker chip (advertises its capabilities)
+  • Charger advertises up to 96W
+  • Currently negotiated: 20V @ 3.25A (65W)
+  • Cable speed: 40 Gbps
+  • Cable rated for 5A at up to 20V (~100W)
+  • Cable made by Apple
+
+Charging: Charging at 65W (charger can do up to 96W)
+  Mac is drawing less than the charger's maximum, which is normal when the battery is nearly full.
+
+=== Port-USB-C@2 ===
+Nothing connected
+Plug a cable into Port-USB-C@2 to see what it can do.
+```
+
+## JSON output
+
+Pass `--json` to receive a single pretty-printed JSON object. The top-level object contains a `version` string and a `ports` array:
+
+```bash
+whatcable --json
+```
+
+```json
+{
+  "version": "0.5.3",
+  "ports": [
+    {
+      "bullets": ["Thunderbolt / USB4 link active", "..."],
+      "cable": {
+        "currentRating": "5 A",
+        "endpoint": "SOP'",
+        "maxVolts": 20,
+        "maxWatts": 100,
+        "speed": "USB4 Gen 3 (20 / 40 Gbps)",
+        "type": "passive",
+        "vendorID": 1452,
+        "vendorName": "Apple"
+      },
+      "charging": {
+        "bottleneck": "macLimit",
+        "detail": "Both the charger and cable can do more, but the Mac is currently asking for less. This is normal once the battery is mostly full, or when the system is idle.",
+        "isWarning": true,
+        "summary": "Charging at 65W (charger can do up to 96W)"
+      },
+      "className": "AppleHPMInterfaceType10",
+      "connectionActive": true,
+      "device": {
+        "kind": "Passive cable",
+        "productID": 0,
+        "vendorID": 1452,
+        "vendorName": "Apple"
+      },
+      "headline": "Thunderbolt / USB4 · 96W charger",
+      "name": "Port-USB-C@1",
+      "powerSources": [
+        {
+          "maxPowerW": 96,
+          "name": "USB-PD",
+          "negotiated": { "currentA": 3.25, "powerW": 65.0, "voltageV": 20.0 },
+          "options": [
+            { "currentA": 3.0, "powerW": 15.0, "voltageV": 5.0 },
+            { "currentA": 3.0, "powerW": 27.0, "voltageV": 9.0 },
+            { "currentA": 3.0, "powerW": 36.0, "voltageV": 12.0 },
+            { "currentA": 3.0, "powerW": 45.0, "voltageV": 15.0 },
+            { "currentA": 3.25, "powerW": 65.0, "voltageV": 20.0 },
+            { "currentA": 4.8, "powerW": 96.0, "voltageV": 20.0 }
+          ]
+        }
+      ],
+      "status": "thunderboltCable",
+      "subtitle": "Supports high-speed data, video, smart cable.",
+      "transports": {
+        "active": ["CIO", "DisplayPort", "USB2", "USB3"],
+        "provisioned": ["CIO", "DisplayPort", "USB2", "USB3"],
+        "supported": ["CIO", "DisplayPort", "USB2", "USB3"]
+      },
+      "type": "Thunderbolt 4"
+    }
+  ]
+}
+```
+
+The keys are sorted alphabetically by the encoder. When `--raw` is also passed, each port object gains a `rawProperties` map (see [Raw mode](#raw-mode)).
+
+The `charging.bottleneck` field is one of: `noCharger`, `chargerLimit`, `cableLimit`, `macLimit`, or `fine`.
+
+## Watch mode
+
+Pass `--watch` to keep `whatcable` running and stream updates as cables are connected and disconnected. The port watcher polls IOKit once per second; the power source and PD identity watchers are notification-driven.
+
+```bash
+whatcable --watch
+```
+
+In text mode, the screen is cleared and redrawn on every change, with a timestamp header:
+
+```
+whatcable --watch · 2026-05-01 14:32:07
+```
+
+In JSON mode (`--watch --json`), each change emits a complete, self-contained JSON object on a new line — newline-delimited JSON (NDJSON), suitable for streaming parsers:
+
+```bash
+whatcable --watch --json
+```
+
+Press **Ctrl+C** to stop. The signal handler shuts down the IOKit watchers cleanly before exiting.
+
+<Note>
+Watch mode only re-renders when the output actually changes. If you plug in a cable and nothing appears, the IOKit data may not have changed yet — wait a moment and the update will arrive.
+</Note>
+
+## Raw mode
+
+Pass `--raw` to append the complete IOKit property dictionary for each port to its output. This is the same data shown in the advanced IOKit section of the popover when you Option-click the menu bar icon.
+
+```bash
+whatcable --raw
+```
+
+In text mode, a `Raw IOKit properties:` section appears at the end of each port block, with each key and value on its own line:
+
+```
+Raw IOKit properties:
+  kUSBCCurrentAdapterWatts = 96
+  kUSBCPortConnectionActive = 1
+  ...
+```
+
+In JSON mode, each port object gains a `rawProperties` field containing the full key/value map as a JSON object.
+
+## Combining flags
+
+All flags can be combined freely. Unknown flags cause `whatcable` to print an error and the help text, then exit with status 2.
+
+```bash
+# Pretty-print full JSON with raw IOKit data
+whatcable --json --raw | jq
+
+# Stream JSON updates with raw properties included
+whatcable --watch --json --raw
+
+# Stream human-readable output with raw IOKit data visible
+whatcable --watch --raw
+```

@@ -1,0 +1,63 @@
+---
+title: "WhatCable: USB-C cable and port diagnostics for macOS"
+description: "WhatCable reads IOKit on Apple Silicon Macs to show cable speed, power capacity, e-marker details, and charging bottlenecks in plain English."
+---
+
+USB-C cables all look identical in your drawer, but a cable that physically fits your port can be anywhere from a USB 2.0 charge-only trickle to a 240 W / 40 Gbps Thunderbolt 4 link. macOS already knows the difference — it negotiates everything via USB Power Delivery and exposes the result through IOKit — but that data has never had a friendly face. WhatCable puts it in your menu bar and on your terminal, in plain English, so you can see at a glance exactly what each cable can do and why your Mac might be charging slowly.
+
+## What WhatCable shows
+
+WhatCable reads three IOKit service families and translates the raw negotiation data into a per-port card for every USB-C port on your Mac.
+
+**At-a-glance headline status**
+
+Each port card opens with a one-line verdict: *Thunderbolt / USB4*, *USB device*, *Charging only*, *Slow USB / charge-only cable*, or *Nothing connected*. If a charger is attached, the wattage is appended to the headline (e.g. *USB device · 96W charger*).
+
+**Charging diagnostic banner**
+
+When a charger is plugged in, WhatCable identifies the bottleneck:
+
+- *"Cable is limiting charging speed"* — the cable is rated below what the charger can supply
+- *"Charging at 30W (charger can do up to 96W)"* — the Mac is deliberately drawing less, typically because the battery is near full
+- *"Charging well at 96W"* — cable, charger, and Mac are all matched
+
+**Cable e-marker info**
+
+For cables that carry an e-marker chip, WhatCable reads it directly and reports the cable's advertised speed (USB 2.0, 5 / 10 / 20 / 40 / 80 Gbps), current rating (3 A / 5 A, up to 60 W / 100 W / 240 W), and the chip's vendor ID resolved to a name.
+
+**Charger PDO list**
+
+Every voltage profile the charger advertises — 5 V, 9 V, 12 V, 15 V, 20 V, and any EPR profiles — is listed with wattage. The currently negotiated profile is highlighted in real time as it changes.
+
+**Connected device identity**
+
+The USB Power Delivery Discover Identity response from the port partner is decoded to show the vendor name and product type of whatever is plugged in.
+
+**Active transports**
+
+The link layer is reported as one or more of: USB 2, USB 3 (SuperSpeed), Thunderbolt / USB4, DisplayPort.
+
+**IOKit raw view**
+
+Hold ⌥ while clicking the menu bar icon (or enable the toggle in Settings) to reveal the underlying IOKit properties for every port — the same data engineers would pull from `ioreg`.
+
+## System requirements
+
+WhatCable requires **macOS 14 Sonoma or later** and an **Apple Silicon Mac**.
+
+Intel Macs are not supported. On Intel hardware, USB-C ports are driven by Intel Titan Ridge / JHL9580 Thunderbolt 3 controllers. Apple's IOKit driver for those controllers does not expose USB-PD negotiation state or cable e-marker VDOs through any public accessor, so there is no path to surface the same information on Intel hardware.
+
+## Why WhatCable is not on the App Store
+
+The App Store requires all apps to run inside the App Sandbox. The App Sandbox blocks the IOKit reads that WhatCable depends on to query port state, PDO lists, and e-marker data. WhatCable is distributed outside the sandbox as a Developer ID–signed, Apple-notarised app — which means Gatekeeper accepts it without warnings, but it cannot be shipped through the App Store.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Install WhatCable" icon="download" href="/installation">
+    Install via Homebrew or download the signed zip from GitHub Releases.
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Read your first USB-C port diagnostic in under a minute.
+  </Card>
+</CardGroup>

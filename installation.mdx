@@ -1,0 +1,57 @@
+---
+title: "Install WhatCable on your Apple Silicon Mac"
+description: "Install WhatCable via Homebrew cask or by downloading the signed and notarised zip from the GitHub Releases page. Requires macOS 14 and Apple Silicon."
+---
+
+WhatCable ships as a standard macOS app bundle that includes both the menu bar app and the `whatcable` CLI binary. You can install it in two ways: via Homebrew, which handles PATH setup automatically, or by downloading the signed zip directly from the GitHub Releases page.
+
+<Tabs>
+  <Tab title="Homebrew (recommended)">
+    Homebrew is the preferred installation method. It keeps WhatCable up to date with `brew upgrade` and automatically symlinks the `whatcable` CLI binary into your PATH so you can use it from any terminal session.
+
+    ```bash
+    brew tap darrylmorley/whatcable
+    brew install --cask whatcable
+    ```
+
+    After installation, both `WhatCable.app` (in `/Applications`) and the `whatcable` CLI command are ready to use immediately. You do not need to manually symlink anything.
+  </Tab>
+  <Tab title="Manual download">
+    Download the latest `WhatCable.zip` from the [GitHub Releases page](https://github.com/darrylmorley/whatcable/releases/latest), unzip it, and drag `WhatCable.app` into your `/Applications` folder.
+
+    The `whatcable` CLI binary is bundled inside the app at:
+
+    ```
+    /Applications/WhatCable.app/Contents/Helpers/whatcable
+    ```
+
+    To use the CLI from the terminal, symlink it into your PATH manually — see the section below.
+  </Tab>
+</Tabs>
+
+<Note>
+WhatCable.app is a universal binary (Apple Silicon + Intel slices), signed with a Developer ID certificate, and notarised by Apple. Gatekeeper accepts it without warnings on any supported Mac. You will not see an "unidentified developer" prompt.
+</Note>
+
+## Symlink the CLI manually (manual installs only)
+
+If you installed WhatCable by dragging the app rather than through Homebrew, run this once to make `whatcable` available in your shell:
+
+```bash
+ln -s /Applications/WhatCable.app/Contents/Helpers/whatcable /usr/local/bin/whatcable
+```
+
+You can verify the installation by running:
+
+```bash
+whatcable --version
+```
+
+The Homebrew install creates this symlink for you automatically.
+
+## System requirements
+
+| Requirement | Detail |
+|---|---|
+| macOS version | macOS 14 Sonoma or later |
+| Architecture | Apple Silicon (M1 or later) — Intel Macs are not supported |
